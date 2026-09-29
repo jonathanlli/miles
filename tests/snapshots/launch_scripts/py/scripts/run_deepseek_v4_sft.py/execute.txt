@@ -1,0 +1,143 @@
+### 0
+pkill -9 sglang; sleep 3; ray stop
+  --force; pkill -9 ray; pkill -9 miles; sleep 3; pkill -9 ray; pkill -9 miles; pkill -9 redis; true; 
+
+### 1
+export PYTHONUNBUFFERED=1 && ray start
+  --head
+  --node-ip-address 127.0.0.1
+  --num-gpus 8
+  --disable-usage-stats
+
+### 2
+nvidia-smi topo -m 2>/dev/null | grep -o 'NV[0-9][0-9]*' | wc -l
+
+### 3
+export no_proxy=127.0.0.1 && export PYTHONUNBUFFERED=1 && ray job submit
+  --address="http://127.0.0.1:8265"
+  --runtime-env-json='{"env_vars": {"PYTHONUNBUFFERED": "1", "CUDA_DEVICE_MAX_CONNECTIONS": "1", "NCCL_NVLS_ENABLE": "0", "no_proxy": "127.0.0.1,127.0.0.1", "MASTER_ADDR": "127.0.0.1", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYTHONPATH": "<REPO_ROOT>:/root/Megatron-LM:/frozen/pythonpath"}}'
+  -- python3 <REPO_ROOT>/train_async.py
+  --disable-bias-linear
+  --num-layers 43
+  --hidden-size 4096
+  --ffn-hidden-size 2048
+  --num-attention-heads 64
+  --normalization RMSNorm
+  --position-embedding-type rope
+  --norm-epsilon 1e-6
+  --swiglu
+  --untie-embeddings-and-output-weights
+  --vocab-size 129280
+  --hidden-dropout 0.0
+  --attention-dropout 0.0
+  --multi-latent-attention
+  --q-lora-rank 1024
+  --kv-lora-rank 512
+  --qk-head-dim 512
+  --qk-pos-emb-head-dim 64
+  --v-head-dim 512
+  --qk-layernorm
+  --rotary-scaling-factor 16
+  --rotary-base 10000
+  --original-max-position-embeddings 65536
+  --beta-fast 32
+  --beta-slow 1
+  --attention-softmax-in-fp32
+  --no-rope-fusion
+  --num-experts 256
+  --moe-layer-freq '[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]'
+  --moe-ffn-hidden-size 2048
+  --moe-router-topk 6
+  --moe-shared-expert-intermediate-size 2048
+  --moe-router-pre-softmax
+  --moe-router-score-function sqrtsoftplus
+  --moe-router-enable-expert-bias
+  --moe-router-load-balancing-type seq_aux_loss
+  --moe-token-dispatcher-type alltoall
+  --moe-aux-loss-coeff 0
+  --moe-grouped-gemm
+  --moe-router-topk-scaling-factor 1.5
+  --num-residual-streams 4
+  --mhc-sinkhorn-iterations 20
+  --csa-compress-ratios '[0,0,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,128,4,0]'
+  --csa-compress-rotary-base 160000
+  --o-groups 8
+  --o-lora-rank 1024
+  --moe-n-hash-layers 3
+  --csa-window-size 128
+  --dsa-indexer-n-heads 64
+  --dsa-indexer-head-dim 128
+  --dsa-indexer-topk 512
+  --spec miles_plugins.models.deepseek_v4.deepseek_v4 get_dsv4_spec
+  --activation-func-clamp-value 10
+  --no-bias-swiglu-fusion
+  --no-activation-func-clamp-shared-expert
+  --hf-checkpoint /root/models/DeepSeek-V4-Flash-Base-bf16
+  --ref-load /root/models/DeepSeek-V4-Flash-Base_torch_dist
+  --load /root/shared_data/checkpoints
+  --save /root/shared_data/checkpoints
+  --save-interval 50
+  --save-retain-interval 500
+  --ckpt-fully-parallel-save-process-group ep_dp 
+  --rollout-function-path miles.rollout.packed_sft_rollout.generate_rollout
+  --prompt-data /root/datasets/dsv4_v18/blend/train_order_520000.jsonl
+  --input-key sample
+  --packed-sft-data-root /root/datasets/dsv4_v18/shards
+  --packed-sft-pack-target 520000
+  --packed-sft-max-tokens 524288
+  --num-rollout 3000
+  --rollout-batch-size 32
+  --global-batch-size 32
+  --loss-type sft_loss
+  --calculate-per-token-loss
+  --disable-compute-advantages-and-returns
+  --debug-train-only 
+  --optimizer adam
+  --lr 2e-05
+  --lr-decay-style cosine
+  --min-lr 5e-06
+  --lr-warmup-iters 150
+  --lr-decay-iters 5850
+  --weight-decay 0.1
+  --adam-beta1 0.9
+  --adam-beta2 0.95
+  --clip-grad 1.0
+  --optimizer-cpu-offload
+  --overlap-cpu-optimizer-d2h-h2d
+  --use-precision-aware-optimizer 
+  --moe-router-dtype fp32
+  --freeze-e-score-correction-bias 
+  --use-wandb
+  --wandb-project miles-run_deepseek_v4_sft
+  --wandb-group 260101-000000-000
+  --wandb-key 'frozen-wandb-api-key'
+  --disable-wandb-random-suffix 
+  --tensor-model-parallel-size 1
+  --pipeline-model-parallel-size 1
+  --context-parallel-size 8
+  --expert-model-parallel-size 8
+  --expert-tensor-parallel-size 1
+  --allgather-cp
+  --cp-partition-mode contiguous
+  --sequence-packing-scheduler dp_balanced
+  --recompute-granularity full
+  --recompute-method uniform
+  --recompute-num-layers 1
+  --use-dynamic-batch-size
+  --max-tokens-per-gpu 65536
+  --seq-length 524288
+  --log-probs-chunk-size 8192 
+  --attention-dropout 0.0
+  --hidden-dropout 0.0
+  --attention-softmax-in-fp32
+  --accumulate-allreduce-grads-in-fp32
+  --dsv4-impl megatron
+  --dsa-kernel-backend cudnn
+  --model-name deepseekv4
+  --qkv-format thd
+  --train-memory-margin-bytes 3221225472
+  --exit-duration-in-mins 225
+  --actor-num-nodes 1
+  --actor-num-gpus-per-node 8
+  --num-gpus-per-node 8   
+  --deploy-component all
