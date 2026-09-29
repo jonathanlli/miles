@@ -105,6 +105,12 @@ def convert_samples_to_train_data(
         loss_masks.append(sample.loss_mask)
     train_data["loss_masks"] = loss_masks
 
+    # per-sample conversation boundaries (packed SFT): lengths of the sub-sequences that make up the sample
+    if any(sample.metadata and sample.metadata.get("subseq_lens") for sample in samples):
+        train_data["subseq_lens"] = [
+            list((sample.metadata or {}).get("subseq_lens") or [len(sample.tokens)]) for sample in samples
+        ]
+
     train_data["rollout_mask_sums"] = _compute_rollout_mask_sums(train_data["rollout_ids"], loss_masks)
 
     # overwriting the raw reward
@@ -429,6 +435,7 @@ def _package_shards(args, data: dict[str, Any], partitions) -> list[dict[str, An
             "rewards",
             "truncated",
             "loss_masks",
+            "subseq_lens",
             "round_number",
             "sample_indices",
             "rollout_ids",
