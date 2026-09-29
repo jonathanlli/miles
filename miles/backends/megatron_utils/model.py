@@ -336,6 +336,7 @@ def forward_only(
 
         forward_only_keys = [
             "tokens",
+            "subseq_lens",
             "loss_masks",
             "multimodal_train_inputs",
             "mrope_position_ids",
@@ -481,6 +482,7 @@ def run_forward_backward_pass(
             data_iterator,
             [
                 "tokens",
+                "subseq_lens",
                 "multimodal_train_inputs",
                 "mrope_position_ids",
                 "packed_seq_params",
