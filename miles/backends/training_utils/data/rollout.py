@@ -226,6 +226,16 @@ def get_batch(
 
     cp_size = parallel_state.cp.size
 
+    # Packed SFT: a sample may hold several conversations; attention must not cross them.
+    subseq_lens = batch.get("subseq_lens")
+    if subseq_lens is not None and all(s is None or len(s) <= 1 for s in subseq_lens):
+        subseq_lens = None
+    if subseq_lens is not None:
+        assert qkv_format == "thd", "per-sample sub-sequences need qkv_format=thd"
+        assert cp_size == 1 or allgather_cp, "per-sample sub-sequences need cp_size=1 or --allgather-cp"
+        for t, lens in zip(tokens, subseq_lens, strict=True):
+            assert lens is None or sum(lens) == t.size(0), f"subseq_lens {sum(lens)} != sample length {t.size(0)}"
+
     if qkv_format == "bshd":
         max_seqlen = batch["max_seq_lens"][0]
         assert max([t.size(0) for t in tokens]) <= max_seqlen
@@ -251,8 +261,10 @@ def get_batch(
             # DSA mode: concatenate all sequences first, then slice once with CP.
             # We also pad the *global* concatenated stream to make per-rank batches equal.
             cu_seqlens_list: list[int] = [0]
-            for t in tokens:
-                cu_seqlens_list.append(cu_seqlens_list[-1] + t.size(0))
+            for k, t in enumerate(tokens):
+                lens = subseq_lens[k] if subseq_lens is not None else None
+                for length in lens or [t.size(0)]:
+                    cu_seqlens_list.append(cu_seqlens_list[-1] + int(length))
 
             tokens = torch.cat(tokens, dim=0)
 
@@ -272,8 +284,10 @@ def get_batch(
             sample_token_lengths = [t.size(0) for t in tokens]
 
             cu_seqlens = [0]
-            for t in tokens:
-                cu_seqlens.append(cu_seqlens[-1] + t.size(0))
+            for k, t in enumerate(tokens):
+                lens = subseq_lens[k] if subseq_lens is not None else None
+                for length in lens or [t.size(0)]:
+                    cu_seqlens.append(cu_seqlens[-1] + int(length))
 
             tokens = torch.cat(tokens)
 
