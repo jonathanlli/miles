@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import time
 
 from miles.ray.placement_group import (
     create_rollout_components,
@@ -67,6 +68,8 @@ async def train(args, *, disposer: Disposer):
         return await rollout_executor.get(rollout_id)
 
     # async train loop.
+    train_start_time = time.time()
+    exit_duration_mins = getattr(args, "exit_duration_in_mins", None)
     rollout_data_next_future = await eager_create_task(prepare_and_generate(args.start_rollout_id))
     for rollout_id in range(args.start_rollout_id, args.num_rollout):
         # Sync the last generation
@@ -96,6 +99,10 @@ async def train(args, *, disposer: Disposer):
         remove_rollout_data_refs(args, rollout_data_curr_ref)
 
         external_save = args.save_trigger_sentinel is not None and os.path.exists(args.save_trigger_sentinel)
+        # --exit-duration-in-mins: save and leave before the scheduler's wall limit (Megatron's own check
+        # lives in its training loop, which miles does not run).
+        time_is_up = exit_duration_mins is not None and (time.time() - train_start_time) / 60 >= exit_duration_mins
+        external_save = external_save or time_is_up
         if external_save or should_run_periodic_action(
             rollout_id, args.save_interval, num_rollout_per_epoch, args.num_rollout
         ):
@@ -104,8 +111,11 @@ async def train(args, *, disposer: Disposer):
             if args.use_critic:
                 await save_training_model(critic_model, rollout_id, force_sync)
             await rollout_executor.save(rollout_id)
-            if external_save:
+            if args.save_trigger_sentinel is not None and os.path.exists(args.save_trigger_sentinel):
                 os.remove(args.save_trigger_sentinel)
+        if time_is_up:
+            logger.info("exit_duration_in_mins=%s reached at rollout_id=%d after saving, exiting", exit_duration_mins, rollout_id)
+            break
 
         if weight_update_due:
             if not args.fully_async:
