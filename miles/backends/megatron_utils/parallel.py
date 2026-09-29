@@ -119,6 +119,10 @@ def get_packed_seq_params(batch: dict[str, torch.Tensor], args: Namespace) -> Pa
             cu_seqlens_host=batch["cu_seqlens_host"],
             total_tokens=batch["cu_seqlens_host"][-1],
         )
+        # miles' --allgather-cp slices the packed stream into contiguous per-rank chunks; tell the model
+        # (Megatron's DSv4 hybrid attention requires cp_partition_mode='contiguous' under CP).
+        if args.backend.cp_partition_mode == "contiguous" and hasattr(packed_seq_params, "cp_partition_mode"):
+            packed_seq_params.cp_partition_mode = "contiguous"
         batch["packed_seq_params"] = packed_seq_params
         return packed_seq_params
     else:
