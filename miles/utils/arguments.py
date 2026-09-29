@@ -2462,6 +2462,26 @@ def get_miles_extra_args_provider(add_custom_arguments=None):
                 choices=["qwen", "qwen3", "distill_qwen"],
                 help="Loss mask type",
             )
+            # pre-tokenized, pre-packed SFT data (miles.rollout.packed_sft_rollout)
+            parser.add_argument(
+                "--packed-sft-data-root",
+                type=str,
+                default=None,
+                help="Root of the materialized shards (<root>/<tag>/docs.tokens.u32, docs.mask.u8, docs.index.npy, "
+                "packs.<target>.json) read by miles.rollout.packed_sft_rollout.",
+            )
+            parser.add_argument(
+                "--packed-sft-pack-target",
+                type=int,
+                default=520000,
+                help="Pack token budget the packs.<target>.json index was built for.",
+            )
+            parser.add_argument(
+                "--packed-sft-max-tokens",
+                type=int,
+                default=524288,
+                help="A pack longer than this (an oversized single conversation) is truncated to this many tokens.",
+            )
             parser.add_argument(
                 "--data-pad-size-multiplier",
                 type=int,
