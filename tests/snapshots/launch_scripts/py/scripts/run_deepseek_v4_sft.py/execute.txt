@@ -133,9 +133,11 @@ export no_proxy=127.0.0.1 && export PYTHONUNBUFFERED=1 && ray job submit
   --accumulate-allreduce-grads-in-fp32
   --dsv4-impl megatron
   --dsa-kernel-backend cudnn
+  --dsa-indexer-use-sparse-loss
   --model-name deepseekv4
   --qkv-format thd
   --train-memory-margin-bytes 3221225472
+  --distributed-timeout-minutes 60
   --exit-duration-in-mins 225
   --actor-num-nodes 1
   --actor-num-gpus-per-node 8
