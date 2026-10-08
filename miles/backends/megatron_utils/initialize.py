@@ -16,6 +16,7 @@ from megatron.training.global_vars import _build_tokenizer, set_args
 from miles.backends.megatron_utils.checkpoint_request import MegatronCkptLoadConfig
 from miles.backends.megatron_utils.megatron_config import MegatronArgsNamespace
 from miles.backends.training_utils.parallel import get_parallel_state, set_parallel_state
+from miles.utils import checkpoint_retention
 from miles.utils.ft_utils.indep_dp import IndepDPInfo
 from miles.utils.hf_utils.config import register_hf_config_aliases
 
@@ -158,6 +159,8 @@ def init(
         from megatron.training.initialize import _initialize_tp_communicators
 
         _initialize_tp_communicators()
+
+    checkpoint_retention.install(args.backend)
 
     if (x := args.custom_megatron_init_path) is not None:
         from miles.utils.args.custom_view import compute_custom_function_config
